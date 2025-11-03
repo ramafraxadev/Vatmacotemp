@@ -1,18 +1,3 @@
- app/components/facturation/__tests__/FacturationsExports.spec.js (2 tests | 2 failed) 160ms
-   × FacturationExports.vue > télécharge une archive quand l’événement est émis 124ms
-     → Cannot read properties of undefined (reading 'extend')
-   × FacturationExports.vue > affiche une notification en cas d’erreur de téléchargement 31ms
-     → Cannot read properties of undefined (reading 'extend')
+ × FacturationExports.vue > affiche une notification en cas d’erreur de téléchargement 245ms
+     → [Function error] is not a spy or a call to a spy!
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
-
- FAIL  app/components/facturation/__tests__/FacturationsExports.spec.js > FacturationExports.vue > télécharge une archive quand l’événement est émis
- FAIL  app/components/facturation/__tests__/FacturationsExports.spec.js > FacturationExports.vue > affiche une notification en cas d’erreur de téléchargement
-TypeError: Cannot read properties of undefined (reading 'extend')
- ❯ app/stores/facturation/store-facturation-documents.js:18:12
-     16|     const $dayjsIsSameOrAfter = inject('dayjsIsSameOrAfter')
-     17|     const $dayjsIsSameOrBefore = inject('dayjsIsSameOrBefore')
-     18|     $dayjs.extend($customParseFormat)
-       |            ^
-     19|     $dayjs.extend($dayjsIsSameOrBefore)
-     20|     $dayjs.extend($dayjsIsSameOrAfter)
