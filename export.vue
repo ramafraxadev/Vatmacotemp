@@ -1,91 +1,93 @@
 <template>
-    <section class="documents_dashboard_export_list">
-        <mc-card
-            card-class="documents_dashboard_export_list_card"
-            card-width="max-content"
-            card-max-width="700px"
-        >
-            <div class="documents_dashboard_export_list_card_titre" test-id="test_ddch">
-                    <mc-title-heading heading-type="heading_3" 
-                    :heading-text="`${documentDasboardExportListTotal} exports`"
-                    ></mc-title-heading>
-                                
+    <div class="documents_actions_document">
+
+        <div class="documents_actions_document_wrapper ">
+            <!-- Documents à fusionner -->
+            <div class="documents_actions_document_wrapper_grid_item">
+                <mc-label label-text="Documents à fusionner :"></mc-label>
+                <span test-id="test_daddfu"
+                    >
+                    {{  documentsActionDocumentDonnee?.merge ? 'Oui': 'Non' }}
+                </span>
             </div>
-            <div>
-                 <p class="documents_dashboard_export_list_card_titre_description" >
-                        Les exports de documents concernent des téléchargements
-                        <mc-link 
-                            link-color="pink" 
-                            link-text="des téléchargements et envois de plus de 10 documents." 
-                            link-href="https://help.macompta.fr/fr/articles/136042-modeles-de-documents-a-telecharger"
-                        ></mc-link>
-                        Le traitement d'un export prend généralement 1 à 2 minutes, mais peut potentiellement durer d'avantage.
-                        <mc-link 
-                            link-color="pink" 
-                            link-text="Une fois l'export traité." 
-                            link-href="https://help.macompta.fr/fr/articles/124677-600-generation-de-l-ecriture-de-paie"
-                        ></mc-link>
-                        celui-ci 
-                        <mc-link 
-                            link-class="{text-decoration: none;}"
-                            link-color="pink" 
-                            link-text="est disponible pendant trois jours sous forme d'une archive Zip." 
-                            link-href="https://help.macompta.fr/fr/articles/124845-conservation-des-donnees"
-                        ></mc-link>
-                    </p>  
+        
+            <!-- Documents à envoyé -->
+            <div class="documents_actions_document_wrapper_grid_item">
+                <mc-label label-text="Documents à envoyé : "></mc-label>
+                <span test-id="test_dadden"
+                    >
+                {{  documentsActionDocumentDonnee?.send ? 'Oui': 'Non' }}
+                </span>
             </div>
 
-            <div test-id="test_ddel">
-                <slot></slot>
+            <!-- Documents à envoyé en copie -->
+            <div class="documents_actions_document_wrapper_grid_item">
+                <mc-label label-text="Documents à envoyé en copie :"></mc-label>
+                <span test-id="test_daddcc"
+                    >
+                    {{  documentsActionDocumentDonnee?.cc ? 'Oui': 'Non' }}
+                </span>
             </div>
-        </mc-card>
-    </section>
-    
+        </div>
+    </div>
 </template>
-<script setup>
-    defineProps({
-        documentDasboardExportListTotal: {
-            type: Number,
-            required: true
-        }   
-    })
 
+<script setup>
+
+    const props = defineProps({
+        /**
+         * @description Model du composant
+          /**
+     * @type {{
+     *   id: Number,
+     *   uuid: String,
+     *   userId: {
+     *     uuid: String
+     *   },
+     *   extension: String,
+     *   type: String,
+     *   isDelete: Boolean,
+     *   statut: Boolean,
+     *   error: Boolean,
+     *   send: Boolean,
+     *   merge: Boolean,
+     *   mail: Boolean,
+     *   cc: Boolean,
+     *   documents: String[],
+     *   destinataires: (String[] ),
+     *   mailContent: (String ),
+     *   archive: (String ),
+     *   createdAt: String,
+     *   updatedAt: (String ),
+     *   hash: String,
+     *   partenaires: String[],
+     *   userMail: String
+     * }}
+     */
+         
+        documentsActionDocumentDonnee: {
+            type: Object,
+            required: true
+        }
+    })
 </script>
 
 <style lang="scss" scoped>
-    .documents_dashboard_export_list {
-        ::v-deep(.documents_dashboard_export_list_card) {
-            border-radius: 9999px;
-            background-color: #f8f8fc;
-            border: 1px solid #d1d1d1;
-            display: flex;
-            flex-direction: column;   
-            justify-content: center;  
-            text-align: center;  
-        }
-        @include mobile {
-            @include centerWithFlex(rowHorizontal, $gap: rem(40));
-            flex-wrap: wrap;
-            margin-bottom: rem(40);
-        }
-        &_card {
-            &_titre {
-                @include mobile {
-                    @include allFlexCenter();
-                    gap: rem(5);
-                    border-bottom: solid rem(1) $greyMedium;
-                    margin-bottom: rem(10);
-                    padding-bottom: rem(5);
-                    text-align: center; 
-                }
-                &_description {
-                    display: block; 
-                    margin-bottom: rem(10);
-                    line-height: 1.5;
-                }
+    .documents_actions_document {
+        &_wrapper {
+            display: grid;
+            grid-template-columns: 1fr; 
+            row-gap: rem(10); 
+            &_grid_item {
+                display: grid;
+                grid-template-columns: auto 1fr;
+                align-items: center;
+                column-gap: rem(20);
+                span {
+                    justify-self: end;
+                }              
+
             }
-            
-        }
-        
+        }        
     }
 </style>
