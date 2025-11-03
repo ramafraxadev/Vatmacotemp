@@ -1,3 +1,6 @@
- × FacturationExports.vue > affiche une notification en cas d’erreur de téléchargement 245ms
-     → [Function error] is not a spy or a call to a spy!
-
+   × DocumentsInformationDocument.vue > affiche "Oui" ou "Non" pour chaque information selon les props 143ms
+     → expected false to be truthy
+ ❯ app/components/facturation/commun/__tests__/DocumentDasboardExportList.spec.js (1 test | 1 failed) 147ms
+   × DocumentDasboardExportList.vue > afficher le nombre total des exports et le mot "exports" 139ms
+     → expected false to be truthy
+ ✓ app/components/facturation/commun/do
