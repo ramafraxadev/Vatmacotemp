@@ -1,25 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-
-import axiosApi from 'axios'
-
-import mckitui from 'mc-kit-ui/src/plugins/mc-kit-ui'
-import dayjs from '@/plugins/dayjs' // ← ajoute ton vrai plugin
-import store from '@/store/store'
-import router from '~/tests/utils/test-router'
-
-import { useFacturationDocumentsStore } from '@/stores/facturation/store-facturation-documents'
-
-import '~/config/templates/env-config'
-import exportsSucces from '~/tests/__fixtures__/facturation/api-facturation-exports-succes.json'
-
-import FacturationExports from '../FacturationExports.vue'
-
-describe('FacturationExports.vue', () => {
-  let wrapper = nullimport { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
 import axiosApi from 'axios'
 
 import mckitui from 'mc-kit-ui/src/plugins/mc-kit-ui'
@@ -97,70 +78,6 @@ describe('FacturationExports.vue', () => {
     const spyTelecharger = vi
       .spyOn(storeFD, 'action__facturationDocuments_telechargerArchive')
       .mockRejectedValueOnce(new Error('Erreur test'))
-
-    const tableauExport = wrapper.findComponent({ name: 'documents-tableau-export' })
-    await tableauExport.vm.$emit('documents-tableau-export-download-emise', {
-      archive: 'Export_30ced1af3875bac0e9d0101f61033929.zip',
-    })
-    await flushPromises()
-
-    expect(spyTelecharger).toHaveBeenCalledOnce()
-    expect(notifySpy).toHaveBeenCalledWith('Erreur test')
-  })
-})
-
-  let mockGet = null
-
-  beforeEach(async () => {
-    mockGet = vi.fn().mockImplementation((url) => {
-      if (/facturationDocuments\/taches\/liste/.test(url)) {
-        return Promise.resolve({ data: JSON.parse(JSON.stringify(exportsSucces)) })
-      }
-      return Promise.resolve({ data: { items: [] } })
-    })
-
-    vi.spyOn(axiosApi, 'get').mockImplementation((url) => mockGet(url))
-    setActivePinia(createPinia())
-
-    wrapper = mount(FacturationExports, {
-      global: {
-        plugins: [mckitui, dayjs, store, router], // ← ajoute ici dayjs
-        provide: {
-          axios: { get: mockGet },
-          McNotify: { error: vi.fn() },
-        },
-      },
-    })
-
-    await flushPromises()
-  })
-
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('télécharge une archive quand l’événement est émis', async () => {
-    const storeFD = useFacturationDocumentsStore()
-    const spyTelecharger = vi
-      .spyOn(storeFD, 'action__facturationDocuments_telechargerArchive')
-      .mockResolvedValueOnce()
-
-    const tableauExport = wrapper.findComponent({ name: 'documents-tableau-export' })
-    await tableauExport.vm.$emit('documents-tableau-export-download-emise', {
-      archive: 'Export_d05ae273160be3fa06a864198edb1ff3.zip',
-    })
-    await flushPromises()
-
-    expect(spyTelecharger).toHaveBeenCalledOnce()
-    expect(spyTelecharger).toHaveBeenCalledWith('Export_d05ae273160be3fa06a864198edb1ff3.zip')
-  })
-
-  it('affiche une notification en cas d’erreur de téléchargement', async () => {
-    const storeFD = useFacturationDocumentsStore()
-    const spyTelecharger = vi
-      .spyOn(storeFD, 'action__facturationDocuments_telechargerArchive')
-      .mockRejectedValueOnce(new Error('Erreur test'))
-    const notifySpy = wrapper.vm.$.appContext.provides.McNotify.error
 
     const tableauExport = wrapper.findComponent({ name: 'documents-tableau-export' })
     await tableauExport.vm.$emit('documents-tableau-export-download-emise', {
