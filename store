@@ -1,0 +1,1270 @@
+/***** Import de Pinia *****/
+import { defineStore } from 'pinia'
+
+/***** Import de Vue JS *****/
+import { computed, inject, ref } from 'vue'
+
+/***** Import de store *****/
+import { useWebappStore } from '../commun/store-webapp'
+
+export const useFacturationDocumentsStore = defineStore('facturationDocuments', () => {
+
+    /***** Import de plugins *****/
+    const $axios = inject('axios')
+    const $dayjs = inject('dayjs')
+    const $customParseFormat = inject('customParseFormat')
+    const $dayjsIsSameOrAfter = inject('dayjsIsSameOrAfter')
+    const $dayjsIsSameOrBefore = inject('dayjsIsSameOrBefore')
+    $dayjs.extend($customParseFormat)
+    $dayjs.extend($dayjsIsSameOrBefore)
+    $dayjs.extend($dayjsIsSameOrAfter)
+
+    /***** Déclaration des stores *****/
+    const storeWebapp = useWebappStore()
+
+    /********************/
+    /***** TEMPLATE *****/
+    /********************/
+    const template__facturationDocuments_documentsFiltre = {
+        fields: 'uuid,id,date,type,num,statut,ref,partenaireLibelle,partenaireUuid,totalHt,totalTtc,statutEnvoi,statutPaiement,transforme,destinations,suiviExist',
+        date_min: '',
+        date_max: '',
+        date_min_echeance: null,
+        date_max_echeance: null,
+        documents: null,
+        famille_client: null,
+        moyen_paiement: null,
+        client: null,
+        statut: null,
+        statut_paiement: null,
+        types: null,
+        limit: 15,
+        offset: 0,
+        sort: null
+    }
+
+    /*****************/
+    /***** STATE *****/
+    /*****************/
+    const state__facturationDocuments_documentsFiltre = ref(JSON.parse(JSON.stringify(template__facturationDocuments_documentsFiltre)))
+    const state__facturationDocuments_liste = ref({})
+    /**
+     * @description Pour indiquer que touts les documents sont charges
+     * @type {Boolean}
+     */
+    const state__facturationDocuments_listeChargee = ref(false)
+    const state__facturationDocuments_documentSelections = ref([])
+    const state__facturationDocuments_uuidsExlus = ref([])
+    const state__facturationDocuments_numeroSuivant = ref(null)
+    const state__facturationDocuments_documentCourant = ref(null)
+    /**
+     * @type {{ value: { 
+     *   uuid: String,
+     *   lignesUuid: String[],
+     *   typeFacturation: String,
+     * }}}
+     */
+    const state__facturationDocuments_documentCree = ref(null)
+    /**
+     * @type {{ 
+    *   idDocument: String,
+    *   numDocument: String,
+    *   statutDocument: String,
+    *   typeDocument: String,
+    *   total_ttc: Number,
+    *   suivis: {
+    *       [String]: {
+    *           [String]: [
+    *               dateEnvoi: String,
+    *               heureEnvoi: String,
+    *               objet: String,
+    *               libellePiecesJointes: String,
+    *               destinataires: String,
+    *               destinatairesCopie: Boolean,
+    *               tacheDocumentUuid: String
+    *           ]
+    *       }
+    *   }
+    * }}
+    */
+    const state__facturationDocuments_suiviMailListe = ref({})
+
+    /**
+     * @type {{
+     *   types: {
+     *    [String]: Number
+     *   },
+     *   valide: Number,
+     *   paye: Number,
+     *   suivi: Number,
+     *   envoye: Number,
+     * }}
+     */
+    const state__facturationDocuments_actionbarConfigurations = ref({
+        types: {},
+        valide: 0,
+        paye: 0,
+        suivi: 0,
+        envoye: 0,
+    })
+
+    /**
+     * @type {Number}
+     */
+    const state__facturationDocuments_estModeMultiSelection = ref(false)
+    /**
+     * @type {{
+     *   id: Number,
+     *   uuid: String,
+     *   userId: {
+     *     uuid: String
+     *   },
+     *   extension: String,
+     *   type: String,
+     *   isDelete: Boolean,
+     *   statut: Boolean,
+     *   error: Boolean,
+     *   send: Boolean,
+     *   merge: Boolean,
+     *   mail: Boolean,
+     *   cc: Boolean,
+     *   documents: String[],
+     *   destinataires: (String[] ),
+     *   mailContent: (String ),
+     *   archive: (String ),
+     *   createdAt: String,
+     *   updatedAt: (String ),
+     *   hash: String,
+     *   partenaires: String[],
+     *   userMail: String
+     * }}
+     */
+    const state__facturationDocuments_listExport = ref({})
+
+    /*******************/
+    /***** ACTIONS *****/
+    /*******************/
+    /**
+     * Reinitialiser les etats pour les documents
+     */
+    const action__facturationDocuments_reinitialiserStore = () => {
+        state__facturationDocuments_documentsFiltre.value = JSON.parse(JSON.stringify(template__facturationDocuments_documentsFiltre))
+        state__facturationDocuments_liste.value = {}
+        state__facturationDocuments_listeChargee.value = false
+        state__facturationDocuments_estModeMultiSelection.value = false
+        state__facturationDocuments_documentSelections.value = []
+        state__facturationDocuments_uuidsExlus.value = []
+        state__facturationDocuments_numeroSuivant.value = null
+        state__facturationDocuments_documentCourant.value = null
+        state__facturationDocuments_documentCree.value = null
+        state__facturationDocuments_suiviMailListe.value = {}
+        state__facturationDocuments_actionbarConfigurations.value = {
+            types: {},
+            valide: 0,
+            paye: 0,
+            suivi: 0,
+            envoye: 0,
+        }
+    }
+    
+    /**
+     * Télécharger une archive ZIP depuis le backend
+     * @param {String} nomArchive - Le nom du fichier ZIP à télécharger (.zip)
+    */
+    const action__facturationDocuments_telechargerArchive = async (nomArchive) => {
+        try {
+            const url = `${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/archives/telechargement/${nomArchive}`
+
+            const response = await $axios.get(url, {
+                ...storeWebapp.state_axiosHeadersJson,
+                responseType: 'blob', 
+            })
+
+            const blob = new Blob([response.data], { type: 'application/zip' })
+            const lien = document.createElement('a')
+            lien.href = URL.createObjectURL(blob)
+            lien.download = nomArchive 
+            document.body.appendChild(lien)
+            lien.click()
+
+            document.body.removeChild(lien)
+            URL.revokeObjectURL(lien.href)
+
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, 'Erreur lors du téléchargement du fichier ZIP.'))
+        } 
+    }
+        
+    
+
+
+    /**
+     * Recuperer une liste des exports
+     * 
+     * @param {Boolean} initialiserListe Si on veut effacer les donnees existant (ex: change de page pour un autre type de document)
+     */
+    const action__facturationDocuments_recupererListeExport = async (initialiserListe = false) => {
+
+        if (initialiserListe) {
+            state__facturationDocuments_listExport.value = {}
+        }
+        
+        try {
+
+            const response = await $axios.get(`${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/taches/liste`, {
+                ...storeWebapp.state_axiosHeadersJson
+            })
+
+            if (!state__facturationDocuments_listExport.value.items) {
+                state__facturationDocuments_listExport.value.items = []
+            }
+
+            if (response.data?.items?.length) {
+                response.data.items.forEach(doc => {
+                    state__facturationDocuments_listExport.value.items.push(doc)
+                })
+            }
+
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, 'Erreur lors de la récupération des documents'))
+        } 
+    }
+    
+    /**
+     * Recuperer une liste des documents
+     * 
+     * @param {Boolean} initialiserListe Si on veut effacer les donnees existant (ex: change de page pour un autre type de document)
+     */
+    const action__facturationDocuments_recupererListe = async (initialiserListe = false) => {
+        let nouvelleConfiguration = state__facturationDocuments_actionbarConfigurations.value
+
+        if (initialiserListe) {
+            state__facturationDocuments_liste.value = {}
+            state__facturationDocuments_estModeMultiSelection.value = false
+            state__facturationDocuments_documentSelections.value = []
+            state__facturationDocuments_uuidsExlus.value = []
+            
+            nouvelleConfiguration = {
+                types: {},
+                valide: 0,
+                paye: 0,
+                suivi: 0,
+                envoye: 0,
+            }
+        }
+        
+        try {
+
+            const params = utility__facturationDocuments_formaterFiltreValeur()
+
+            if (state__facturationDocuments_documentsFiltre.value.limit > 0) {
+                params.limit = state__facturationDocuments_documentsFiltre.value.limit
+            }
+
+            if (state__facturationDocuments_documentsFiltre.value.offset > 0) {
+                params.offset = state__facturationDocuments_documentsFiltre.value.offset
+            }
+
+            const response = await $axios.get(window.VUE_APP_API_FACTURATION_DOCUMENTS_URL, {
+                ...storeWebapp.state_axiosHeadersJson,
+                params: params,
+            })
+
+            state__facturationDocuments_documentsFiltre.value.offset = response.data.nextOffset || -1
+            state__facturationDocuments_listeChargee.value = response.data.endList
+
+            if (!state__facturationDocuments_liste.value.items) {
+                state__facturationDocuments_liste.value.items = []
+                state__facturationDocuments_liste.value.total = response.data.nombreDocuments || 0
+                state__facturationDocuments_liste.value.totaux = response.data.totaux
+            }
+
+            if (response.data?.items?.length) {
+                response.data.items.forEach(doc => {
+                    state__facturationDocuments_liste.value.items.push(doc)
+
+                    if (state__facturationDocuments_estModeMultiSelection.value && !doc.isLock) {
+                        state__facturationDocuments_documentSelections.value.push(doc.uuid)
+
+                        // configuration du menu
+                        // type
+                        const types = nouvelleConfiguration.types
+                        if (types[doc.type] === undefined) {
+                            types[doc.type] = 0
+                        }
+                        types[doc.type] += 1
+                        nouvelleConfiguration.types = types
+
+                        // statut
+                        if (doc.statut === 'valide') {
+                            nouvelleConfiguration.valide += 1
+                        }
+
+                        // statut envoi
+                        if (doc.statutEnvoi == '1') {
+                            nouvelleConfiguration.envoye += 1
+                        }
+
+                        // statut paiement
+                        if (doc.statutPaiement) {
+                            nouvelleConfiguration.paye += 1
+                        }
+
+                        // suivi exist
+                        if (doc.suiviExist == '1') {
+                            nouvelleConfiguration.suivi += 1
+                        }
+                    }
+                })
+            }
+
+        } catch (error) {
+            state__facturationDocuments_listeChargee.value = true
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, 'Erreur lors de la récupération des documents'))
+        } finally {
+            state__facturationDocuments_actionbarConfigurations.value = nouvelleConfiguration
+        }
+    }
+
+    /**
+     * Récupère le numéro du prochain document en fonction du type de document sélectionné.
+     * 
+     * @param {string} type - Le type de document pour lequel récupérer le numéro suivant (devis, bl, avoir, facture).
+     * 
+     * @returns {Promise<void>}
+     * 
+     * @throws {Error} Si une erreur se produit lors de la récupération du numéro.
+     */
+    const action__facturationDocuments_recupererNumeroSuivant = async (type) => {
+        try {
+            const url = `${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/next-num/${type}`
+            state__facturationDocuments_numeroSuivant.value = null
+
+            const response = await $axios.get(url, storeWebapp.state_axiosHeadersJson)
+            if (response.data && response.data.items && response.data.items.length > 0) {
+                state__facturationDocuments_numeroSuivant.value = response.data.items[0].nextNum
+            }
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, 'Erreur lors de la récupération du numero du prochain document'))
+        }
+    }
+
+    /**
+     * Creer un document.
+     * 
+     * @param {{
+     *   acompte: String,
+     *   date: String,
+     *   dateValidite: String,
+     *   num: String,
+     *   partenaireUuid: String,
+     *   ref: String,
+     *   type: String,
+     * }} document - Le type de document pour lequel récupérer le numéro suivant (devis, bl, avoir, facture).
+     * 
+     * @throws {Error} Si une erreur se produit lors de la creation du document.
+     */
+    const action__facturationDocuments_creerDocument = async (document) => {
+        try {
+            const url = window.VUE_APP_API_FACTURATION_DOCUMENTS_URL
+            const response = await $axios.post(url, document, storeWebapp.state_axiosHeadersJson)
+            if (response.data && response.data.items && response.data.items.length > 0) {
+                state__facturationDocuments_documentCree.value = response.data.items[0]
+            }
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, 'Erreur lors de la création du document'))
+        }
+    }
+
+    /**
+    * Modifier un document.
+    * 
+    * @param {{
+    *   uuid: String,
+    *   type: String,
+    *   entete: {
+    *      acompte: String,
+    *      date: String,
+    *      dateValidite: String,
+    *      num: String,
+    *      partenaireUuid: String,
+    *      ref: String,
+    *   },
+    *   lignes: String // JSON.stringify([ligne1, ligne2, ...])
+    * }[]} document - Le type de document pour lequel récupérer le numéro suivant (devis, bl, avoir, facture).
+    * 
+    * @throws {Error} Si une erreur se produit lors de la creation du document.
+    **/
+   const action__facturationDocuments_modifierDocument = async (documents) => {
+       try {
+           const url = window.VUE_APP_API_FACTURATION_DOCUMENTS_URL
+           const payload = { documents: {} }
+           documents.forEach((document, index) => {
+               payload.documents[`${index}`] = document
+           })
+           await $axios.put(url, payload, storeWebapp.state_axiosHeadersJson)
+       } catch (error) {
+           throw new Error(utility__facturationDocuments_recupererMessageErreur(error, 'Erreur lors de la modification du document'))
+       }
+   }
+
+   /**
+    * Recuperer un document.
+    * 
+    * @param {Number} index -L'index du document a recuper pamis la liste
+    * 
+    * @returns {Promise<void>}
+    * 
+    * @throws {Error} Si une erreur se produit lors de la recuperation du document.
+    **/
+    const action__facturationDocuments_recupererDetailDocument = async (index) => {
+        if (index < 0 || index >= state__facturationDocuments_liste.value.total) {
+            throw new Error(`L'index d'un document doit etre entre 0 et ${state__facturationDocuments_liste.value.total}`)
+        }
+        try {
+                const doc = state__facturationDocuments_liste.value.items[index]
+                const url = `${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/${doc.uuid}`
+                const response = await $axios.get(url, storeWebapp.state_axiosHeadersJson)
+                if (response.data && response.data.items && response.data.items.length > 0) {
+                    state__facturationDocuments_documentCourant.value = {
+                        index: index,
+                        valeur: response.data.items[0],
+                    }
+                }
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, 'Erreur lors de la recuperation du document'))
+        }
+    }
+
+    /**
+    * Supprimer un ou plusieurs documents.
+    * 
+    * @param {String[]} documents Les UUID des documents
+    * 
+    * @returns {Promise<void>}
+    * 
+    * @throws {Error} Si une erreur se produit lors de la supression du document.
+    **/
+    const action__facturationDocuments_supprimerDocument = async (documents) => {
+        if (documents.length === 0) {
+            throw new Error('Vous devez sélectionner un ou plusieurs document pour exécuter cette action.')
+        }
+
+        if (utility__facturationDocuments_recupererNombreDocumentValide(documents) > 0) {
+            throw new Error('Le document au statut "Validé" ne peut pas être supprimé.')
+        }
+
+        try {
+            const url = `${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/supprimer`
+            await $axios.post(url, { documents }, storeWebapp.state_axiosHeadersJson)
+
+            documents.forEach(docUuid => {
+                const documentIndex = state__facturationDocuments_liste.value.items.findIndex(document => document.uuid === docUuid)
+
+                if (documentIndex >= 0) {
+                    const documentSupprimes = state__facturationDocuments_liste.value.items.splice(documentIndex, 1)
+                    
+                    // mettre a jour le total
+                    utility__facturationDocuments_appliquerTotaux(documentSupprimes[0])
+                }
+            })
+
+            // mettre a jour la selection
+            state__facturationDocuments_documentSelections.value = []
+            state__facturationDocuments_actionbarConfigurations.value = {
+                types: {},
+                valide: 0,
+                paye: 0,
+                suivi: 0,
+                envoye: 0,
+            }
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, 'Erreur lors de la suppression du document'))
+        }
+    }
+
+    /**
+    * Marquer comme envoyer ou non envoyer un ou plusieurs documents.
+    * 
+    * @param {String[]} documents Les UUID des documents
+    * @param {Boolean} statutEnvoi true = envoyer / false = non envoyer
+    * 
+    * @returns {Promise<void>}
+    * 
+    * @throws {Error} Si une erreur se produit lors de la modification du statut envoi du document.
+    **/
+    const action__facturationDocuments_modifierStatutEnvoiDocument = async (documents, statutEnvoi) => {
+        if (documents.length === 0) {
+            throw new Error('Vous devez sélectionner un ou plusieurs document pour executer cette action.')
+        }
+
+        try {
+            const url = `${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/statutEnvoie/modifier`
+            await $axios.patch(url, { documents, statutEnvoi }, storeWebapp.state_axiosHeadersJson)
+
+            documents.forEach(docUuid => {
+                const documentIndex = state__facturationDocuments_liste.value.items.findIndex(document => document.uuid === docUuid)
+
+                if (documentIndex >= 0) {
+                    state__facturationDocuments_liste.value.items[documentIndex].statutEnvoi = statutEnvoi ? '1' : '0'
+                }
+            })
+
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, `Erreur lors de la modification du statut d'envoi du document`))
+
+        }
+    }
+
+    /**
+     * Marquer comme payer ou non payer un ou plusieurs documents.
+     *
+     * @param {String[]} documents - Les UUIDs des factures
+     * @param {Boolean} statutPaiement - true = payer / false = non payer
+     *
+     * @returns {Promise<void>}
+     * @throws {Error} - Si une erreur se produit lors de la modification du statut paiement du document.
+     */
+    const action__facturationDocuments_modifierStatutPaiementFacture = async (documents, statutPaiement) => {
+        if (documents.length === 0) {
+            throw new Error('Vous devez sélectionner au moins une facture à marquer comme payée ou non payée.')
+        }
+
+        try {
+            const url = `${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/payer`
+            await $axios.patch(url,{ documents, statutPaiement }, storeWebapp.state_axiosHeadersJson)
+
+            documents.forEach(docUuid => {
+                const documentIndex = state__facturationDocuments_liste.value.items.findIndex(document => document.uuid === docUuid)
+
+                if (documentIndex >= 0) {
+                    state__facturationDocuments_liste.value.items[documentIndex].statutPaiement = statutPaiement
+                   
+                    if (!utility__facturationDocuments_estFiltreInclus(state__facturationDocuments_liste.value.items[documentIndex])) {
+                        const documentSupprimes = state__facturationDocuments_liste.value.items.splice(documentIndex, 1)
+
+                        utility__facturationDocuments_appliquerTotaux(documentSupprimes[0])
+                    }
+                }
+            })
+
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, 'Erreur lors de la modification du statut de paiement de facture'))
+            
+        }
+    }
+
+    /**
+    * Dupliquer un ou plusieurs documents.
+    * 
+    * @param {String[]} documents Les UUID des documents
+    * @param {String} date La date au format DD/MM/YYYY choisie pour le(s) document(s)
+    * @param {String} firstNum Le numero a appliquer pour le prenier document
+    * 
+    * @returns {Promise<void>}
+    * 
+    * @throws {Error} Si une erreur se produit lors de la duplication du document.
+    **/
+    const action__facturationDocuments_dupliquerDocument = async (documents, date) => {
+        if (documents.length === 0) {
+            throw new Error('Vous devez sélectionner un ou plusieurs document pour executer cette action.')
+        }
+
+        try {
+            const dateApi = $dayjs(date, 'DD/MM/YYYY').format('YYYY-MM-DD')
+            const url = `${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/dupliquer`
+            
+            const response = await $axios.post(url, { documents, date: dateApi }, storeWebapp.state_axiosHeadersJson)
+
+            if (response.data && response.data.items && response.data.items.length > 0) {
+                const apiDocumentsUuids = response.data.items
+                documents.forEach((docUuid,  index) => {
+                    const documentIndex = state__facturationDocuments_liste.value.items.findIndex(document => document.uuid === docUuid)
+                    if (documentIndex >= 0) {
+                        const documentDuplique = utility__facturationDocuments_copierDocument(
+                            state__facturationDocuments_liste.value.items[documentIndex],
+                            apiDocumentsUuids[index].uuid,
+                            apiDocumentsUuids[index].num,
+                            dateApi
+                        )
+
+                        if (utility__facturationDocuments_estFiltreInclus(documentDuplique)) {
+                            state__facturationDocuments_liste.value.items.unshift(documentDuplique)
+
+                            utility__facturationDocuments_appliquerTotaux(documentDuplique, true)
+                        }
+                    }
+                })
+            }
+
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, `Erreur lors de la duplication du document`))
+        }
+    }
+
+    /**
+    * Valider un ou plusieurs documents.
+    * 
+    * @param {String[]} documents Les UUID des documents
+    * @param {Boolean} estDernierDateApplique Si on veut appliquer la date de derniere facture ou avoir pour eviter l'erreur de chronologie
+    * 
+    * @returns {Promise<void>}
+    * 
+    * @throws {Error} Si une erreur se produit lors de la validation du document.
+    **/
+    const action__facturationDocuments_validerDocument = async (documents, estDernierDateApplique = false) => {
+        if (documents.length === 0) {
+            throw new Error('Vous devez sélectionner un ou plusieurs document pour exécuter cette action.')
+        }
+
+        try {
+            const url = `${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/valider`
+            const payload = { documents }
+
+            if (estDernierDateApplique) {
+                payload.setLastValidateDate = true
+            }
+
+            const response = await $axios.patch(url, payload, storeWebapp.state_axiosHeadersJson)
+
+            if (response.data && response.data.items && response.data.items.length > 0) {
+                const apiDocumentsUuids = response.data.items
+
+                documents.forEach((docUuid, index) => {
+                    const documentIndex = state__facturationDocuments_liste.value.items.findIndex(document => document.uuid === docUuid)
+    
+                    if (documentIndex >= 0) {
+                        state__facturationDocuments_liste.value.items[documentIndex].statut = 'valide'
+                        state__facturationDocuments_liste.value.items[documentIndex].num = apiDocumentsUuids[index].num
+    
+                        if (!utility__facturationDocuments_estFiltreInclus(state__facturationDocuments_liste.value.items[documentIndex])) {
+                            const documentSupprimes = state__facturationDocuments_liste.value.items.splice(documentIndex, 1)
+    
+                            utility__facturationDocuments_appliquerTotaux(documentSupprimes[0])
+                        }
+
+                        // mettre a jour document courant
+                        if (docUuid === state__facturationDocuments_documentCourant.value?.valeur.uuid) {
+                            state__facturationDocuments_documentCourant.value.valeur.statut = 'valide'
+                            state__facturationDocuments_documentCourant.value.valeur.num = apiDocumentsUuids[index].num
+                        }
+                    }
+
+                })
+            }
+
+        } catch (error) {
+            let erreurMessage = 'Erreur lors de la validation du document'
+            if (error.response?.data) {
+                const errors = error.response.data.errors
+
+                if (errors && errors.length > 0) {
+                    // erreur chronologie, date dans le futur
+                    throw new Error(errors[0]?.message ?? erreurMessage, { cause: errors[0] })
+
+                } else if (errors.errors && errors.errors.message) {
+                    erreurMessage = errors.errors.message
+                }
+            }
+
+            console.error(erreurMessage, error)
+
+            throw new Error(erreurMessage)
+        }
+    }
+
+    /**
+    * Transformer un ou plusieurs documents.
+    * 
+    * @param {String[]} documents Les UUID des documents
+    * @param {String} date La date au format DD/MM/YYYY choisie pour le(s) document(s)
+    * @param {String} firstNum Le numero a appliquer pour le prenier document
+    * @param {String} typeTransformation Le type du document souhaite
+    * 
+    * @returns {Promise<void>}
+    * 
+    * @throws {Error} Si une erreur se produit lors de la transformation du document.
+    **/
+    const action__facturationDocuments_transformerDocument = async (documents, date, typeTransformation) => {
+        if (documents.length === 0) {
+            throw new Error('Vous devez sélectionner un ou plusieurs document pour executer cette action.')
+        }
+
+        try {
+            const dateApi = $dayjs(date, 'DD/MM/YYYY').format('YYYY-MM-DD')
+            const url = `${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/transformer`
+            
+            const response = await $axios.post(url, { documents, date: dateApi, typeTransformation }, storeWebapp.state_axiosHeadersJson)
+
+            if (response.data && response.data.items && response.data.items.length > 0) {
+                const apiDocumentsUuids = response.data.items
+
+                documents.forEach((docUuid, index) => {
+                    const documentIndex = state__facturationDocuments_liste.value.items.findIndex(document => document.uuid === docUuid)
+                    if (documentIndex >= 0) {
+                        const documentTransforme = utility__facturationDocuments_copierDocument(
+                            state__facturationDocuments_liste.value.items[documentIndex],
+                            apiDocumentsUuids[index].uuid,
+                            apiDocumentsUuids[index].num,
+                            dateApi,
+                            typeTransformation
+                        )
+                        
+                        state__facturationDocuments_liste.value.items[documentIndex].statut = 'valide'
+                        
+                        if (!utility__facturationDocuments_estFiltreInclus(state__facturationDocuments_liste.value.items[documentIndex])) {
+                            const documentSupprimes = state__facturationDocuments_liste.value.items.splice(documentIndex, 1)
+
+                            utility__facturationDocuments_appliquerTotaux(documentSupprimes[0])
+                        }
+    
+                        if (utility__facturationDocuments_estFiltreInclus(documentTransforme)) {
+                            state__facturationDocuments_liste.value.items.unshift(documentTransforme)
+    
+                            utility__facturationDocuments_appliquerTotaux(documentTransforme, true)
+                        }
+
+                        // mettre a jour document courant
+                        if (docUuid === state__facturationDocuments_documentCourant.value?.valeur.uuid) {
+                            state__facturationDocuments_documentCourant.value.valeur.statut = 'valide'
+                        }
+                    }
+                })
+            }
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, `Erreur lors de la transformation du document`))
+        }
+    }
+
+    /**
+    * Recuperer le suivi mail d'un document.
+    * 
+    * @param {String} documentUuuid L'UUID du document
+    * 
+    * @returns {Promise<void>}
+    * 
+    * @throws {Error} Si une erreur se produit lors de la recuperation du suivi mail du document.
+    **/
+    const action__facturationDocuments_recupererSuiviMailListe = async (documentUuuid) => {
+        try {
+            const response = await $axios.get(`${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/suivi_mail`, {
+                ...storeWebapp.state_axiosHeadersJson,
+                params: {
+                    document_uuid: documentUuuid,
+                    group: true,
+                    sort: 'SEM.date_envoi-DESC,dateEnvoi-DESC,heureEnvoi-DESC',
+                }
+            })
+            state__facturationDocuments_suiviMailListe.value = response.data?.items[0] ?? {}
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, 'Erreur lors de la récupération des suivis mails du document'))
+        }
+    }
+
+    /**
+    * Creer un export pour des documents.
+    * 
+    * @param {String[]} documents Les UUID des documents
+    * @param {String} extension L'extension souhaite de l'export
+    * @param {Boolean} estMail Si l'export sert a l'envoi de mail
+    * @param {{
+    *   cc: Boolean,
+    *   destinataires: String,
+    *   mailContent: String
+    * }} mailOptions Les options disponibles pour l'envoi d'email
+    * 
+    * @returns {Promise<void>}
+    * 
+    * @throws {Error} Si une erreur se produit lors de la creation de lexport.
+    **/
+    const action__facturationDocuments_creerExport = async (documents, extension = 'pdf', estMail = false, mailOptions = {}) => {
+        try {
+            const url = `${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/taches`
+            
+            // l'api retourne un erreur si on envoit pas cc pourtant il devrait etre optionnel
+            if (!mailOptions.cc) {
+                mailOptions.cc = false
+            }
+
+            const payload = {
+                ...mailOptions,
+                mail: estMail,
+                extension: extension,
+                documents: documents.join(','),
+                merge: false,
+            }
+            
+            await $axios.post(url, payload, storeWebapp.state_axiosHeadersJson)
+        
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, `Erreur lors de la creation d'export pour les documents`))
+            
+        }
+    }
+
+    /**
+    * Envoyer des documents par mail.
+    * 
+    * @param {{
+    *   sender: {
+    *       name: String,
+    *       email: String
+    *   },
+    *   to: {
+    *       name: String,
+    *       email: String
+    *   }[],
+    *   cc: Boolean,
+    *   subject: String,
+    *   content: String,
+    *   documentsId: Number[],
+    *   attachments: {
+    *       name: String,
+    *       content: String
+    *   }[]
+    * }} mailOptions Les options du mail pour l'envoi de document
+    * 
+    * @returns {Promise<void>}
+    * 
+    * @throws {Error} Pour indiquer s'il y a une erreur.
+    **/
+    const action__facturationDocuments_envoyer = async (mailOptions) => {
+        try {
+            const url = `${window.VUE_APP_API_FACTURATION_DOCUMENTS_URL}/envoyer`
+            await $axios.post(url, mailOptions, storeWebapp.state_axiosHeadersJson)
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, `Erreur lors de l'envoi d'email de document`))
+        }
+    }
+
+    /**
+    * Exporter la liste des deocuments en CSV
+    * 
+    * @returns {Promise<void>}
+    * 
+    * @throws {Error} Si une erreur se produit lors de l'exportation de la liste du document.
+    **/
+    const action__facturationDocuments_exporterListeCsv = async () => {
+        try {
+            const payload = utility__facturationDocuments_recupererParametreExport()
+
+            const response = await $axios.post(
+                `${window.VUE_APP_API_FACTURATION_GENERATION_DOCUMENTS_URL}/csv/liste`,
+                { filters: payload },
+                storeWebapp.state_axiosHeadersJson
+            )
+
+            if (response.data) {
+                const csv = atob(response.data.content)
+                const csvDonnees = new Array(csv.length)
+
+                for (let i = 0; i < csv.length; i++) {
+                    csvDonnees[i] = csv.charCodeAt(i)
+                }
+
+                const csvDonneesBinaire = new Blob([new Uint8Array(csvDonnees)], { type: 'text/csv;charset=utf-8;' })
+                const lienHref = URL.createObjectURL(csvDonneesBinaire)
+
+                const lien = document.createElement('a')
+                lien.href = lienHref
+                lien.target = '_blank'
+                lien.rel = 'noopener'
+                lien.download = response.data.filename
+
+                lien.click()
+
+                URL.revokeObjectURL(lienHref)
+            }
+
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, `Erreur lors de l'exportation de document`))
+        }
+    }
+
+    /**
+    * Exporter la liste des deocuments en PDF
+    * 
+    * @returns {Promise<void>}
+    * 
+    * @throws {Error} Si une erreur se produit lors de l'exportation de la liste du document.
+    **/
+    const action__facturationDocuments_exporterListePdf = async () => {
+        try {
+            const payload = utility__facturationDocuments_recupererParametreExport()
+
+            const response = await $axios.post(
+                `${window.VUE_APP_API_FACTURATION_GENERATION_DOCUMENTS_URL}/pdf/liste`,
+                { filters: payload },
+                storeWebapp.state_axiosHeadersJson
+            )
+
+            if (response.data) {
+                const pdf = atob(response.data.content)
+                const pdfDonnees = new Array(pdf.length)
+
+                for (let i = 0; i < pdf.length; i++) {
+                    pdfDonnees[i] = pdf.charCodeAt(i)
+                }
+
+                const pdfDonneesBinaire = new Blob([new Uint8Array(pdfDonnees)], { type: 'application/pdf' })
+                const lienHref = URL.createObjectURL(pdfDonneesBinaire)
+
+                const lien = document.createElement('a')
+                lien.href = lienHref
+                lien.target = '_blank'
+                lien.rel = 'noopener'
+    
+                lien.click()
+
+                URL.revokeObjectURL(lienHref)
+            }
+
+
+        } catch (error) {
+            throw new Error(utility__facturationDocuments_recupererMessageErreur(error, `Erreur lors de l'exportation de document`))
+        }
+    }
+
+    /******************/
+    /***** GETTERS ****/
+    /******************/
+    /**
+     * Recupere la valeur de *totaux* dans le state__facturationDocuments_liste.
+     * Parfois, l'API retourne une valeur null pour *totaux* et ca pose problème pour toFormatAmount.
+     * 
+     * @returns {{
+     *   totalHt: number,
+     *   totalTtc: number,
+     *   totalNet: number,
+     *   totalTva: number,
+     * }}
+     */
+    const getters__facturationDocuments_documentsTotaux = computed(() => {
+        const totaux = state__facturationDocuments_liste.value.totaux
+        return {
+            totalHt: totaux?.totalHt ?? 0.0,
+            totalNet: totaux?.totalNet ?? 0.0,
+            totalTtc: totaux?.totalTtc ?? 0.0,
+            totalTva: totaux?.totalTva ?? 0.0,
+        }
+    })
+
+    /**
+     * Recupere la valeur total du montantHt du contenu de state__facturationDocuments_liste.
+     * 
+     * @returns {number}
+     */
+    const getters__facturationDocuments_totalMontantHt = computed(() => {
+        if (state__facturationDocuments_liste.value.items) {
+            return state__facturationDocuments_liste.value.items.reduce((sum, document) => {
+                return sum + (document.totalHt ? parseFloat(document.totalHt) : 0)
+            }, 0)
+        }
+        return 0
+    })
+
+    /**
+     * Recupere la valeur total du montantTtc du contenu de state__facturationDocuments_liste.
+     * 
+     * @returns {number}
+     */
+    const getters__facturationDocuments_totalMontantTtc = computed(() => {
+        if (state__facturationDocuments_liste.value.items) {
+            return state__facturationDocuments_liste.value.items.reduce((sum, document) => {
+                return sum + (document.totalTtc ? parseFloat(document.totalTtc) : 0)
+            }, 0)
+        }
+        return 0
+    })
+
+    /*******************/
+    /***** UTILITY *****/
+    /*******************/
+    /**
+     * Prepare la valeur du filtre avant de l'envoyer à l'API.
+     * 
+     * @param {Boolean} estListeChampInclus Si on veut ajouter la liste des champs a recuperer
+     * 
+     * @returns {{
+     *   fields: string,
+     *   types: string,
+     *   statut: string,
+     *   statut_paiement: Boolean,
+     *   famille_clients_uuid: string,
+     *   partenaire_uuid: string,
+     *   date_min: string,
+     *   date_max: string,
+     *   sort: String,
+     * }}
+     */
+    const utility__facturationDocuments_formaterFiltreValeur = (estListeChampInclus = true) => {
+        const payload = {}
+
+        if (estListeChampInclus) {
+            payload.fields = state__facturationDocuments_documentsFiltre.value.fields
+        }
+
+        if (state__facturationDocuments_documentsFiltre.value.types) {
+            payload.types = state__facturationDocuments_documentsFiltre.value.types
+        }
+
+        if (state__facturationDocuments_documentsFiltre.value.statut && state__facturationDocuments_documentsFiltre.value.statut.value !== 'tous') {
+            payload.statut = state__facturationDocuments_documentsFiltre.value.statut.value
+        }
+
+        if (state__facturationDocuments_documentsFiltre.value.statut_paiement && state__facturationDocuments_documentsFiltre.value.statut_paiement.value !== 'tous') {
+            payload.statut_paiement = state__facturationDocuments_documentsFiltre.value.statut_paiement.value
+        }
+
+        if (state__facturationDocuments_documentsFiltre.value.famille_client) {
+            payload.famille_clients_uuid = state__facturationDocuments_documentsFiltre.value.famille_client.value
+        }
+
+        if (state__facturationDocuments_documentsFiltre.value.client) {
+            payload.partenaire_uuid = state__facturationDocuments_documentsFiltre.value.client.value
+        }
+
+        if (state__facturationDocuments_documentsFiltre.value.date_min) {
+            payload.date_min = $dayjs(state__facturationDocuments_documentsFiltre.value.date_min, 'DD/MM/YYYY').format('YYYY-MM-DD')
+        }
+        
+        if (state__facturationDocuments_documentsFiltre.value.date_max) {
+            payload.date_max = $dayjs(state__facturationDocuments_documentsFiltre.value.date_max, 'DD/MM/YYYY').format('YYYY-MM-DD')
+        }
+
+        if (state__facturationDocuments_documentsFiltre.value.sort) {
+            payload.sort =  state__facturationDocuments_documentsFiltre.value.sort
+        }
+
+        return payload
+    }
+
+    /**
+     * Récupère l'erreur lors de l'appel de l'API.
+     * 
+     * @param {Object} error - L'erreur renvoyée par l'API.
+     * 
+     * @returns {string} - Le message d'erreur.
+     */
+    const utility__facturationDocuments_recupererMessageErreur = (error, message = `Erreur lors de l'execution de l'action`) => {
+        console.error(message, error)
+        const errors = error.response?.data
+        if (errors) {
+            // erreur axios (http ou autre)
+            if (errors.errors && errors.errors.length > 0) {
+                return errors.errors[0].message ?? errors.errors[0]
+            }
+
+            // erreur sous forme d'objet
+            if (errors.errors && errors.errors.message) {
+                return errors.errors.message
+            }
+        }
+        return message
+    }
+
+    /**
+     * Récupère le nombre de documents valide parmis les UUID donnees.
+     * 
+     * @param {String[]} documentUuids Les UUIDs du document
+     * 
+     * @returns {Number} Le nombre du document valid
+     */
+    const utility__facturationDocuments_recupererNombreDocumentValide = (documentUuids) => {
+        let result = 0
+        if (state__facturationDocuments_liste.value.items) {
+            documentUuids
+                .forEach(docUuid => {
+                    const doc = state__facturationDocuments_liste.value.items.find(item => item.uuid === docUuid)
+                    if (doc && doc.statut === 'valide') {
+                        result++
+                    }
+                })
+        }
+        return result
+    }
+
+    /**
+     * Mettre a jour les totaux sans faire appel a l'API recuperation de documents.
+     * 
+     * @param {Object} document Le document à ajouter ou à supprimer.
+     * @param {boolean} addition Pour indiquer si un nouveau document ou un document à supprimer.
+     */
+    const utility__facturationDocuments_appliquerTotaux = (document, addition = false) => {
+        const multiplicateur = addition ? 1 : -1
+
+        const totalHt = parseFloat(document.totalHt) || 0
+        const totalTtc = parseFloat(document.totalTtc) || 0
+        const totalNet = parseFloat(document.totalNet) || 0
+        const totalTva = parseFloat(document.totalTva) || 0
+
+        const totaux = getters__facturationDocuments_documentsTotaux.value
+
+        state__facturationDocuments_liste.value.totaux = {
+            totalHt: totaux.totalHt + ( multiplicateur * totalHt),
+            totalNet: totaux.totalNet + ( multiplicateur * totalNet),
+            totalTtc: totaux.totalTtc + ( multiplicateur * totalTtc),
+            totalTva: totaux.totalTva + ( multiplicateur * totalTva),
+        }
+    }
+
+    /**
+     * Verifier si un document est inclus dans le filtre actif.
+     * 
+     * @param {Object} document Le document a verifier.
+     * @param {Boolean} siPasFiltre La valeur à retourner si pas de filtre actif
+     * 
+     * @returns {Boolean}
+     */
+    const utility__facturationDocuments_estFiltreInclus = (document, siPasFiltre = true) => {
+        if (state__facturationDocuments_documentsFiltre.value == null) {
+            return siPasFiltre
+        }
+
+        let estInclusType = true
+        if (state__facturationDocuments_documentsFiltre.value.types) {
+            estInclusType = state__facturationDocuments_documentsFiltre.value.types.includes(document.type)
+        }
+
+        let estInclusStatut = true
+        if (state__facturationDocuments_documentsFiltre.value.statut) {
+            estInclusStatut = state__facturationDocuments_documentsFiltre.value.statut.value === document.statut || state__facturationDocuments_documentsFiltre.value.statut.value === 'tous'
+        }
+
+        let estInclusStatutPaiement = true
+        if (state__facturationDocuments_documentsFiltre.value.statut_paiement) {
+            estInclusStatutPaiement = state__facturationDocuments_documentsFiltre.value.statut_paiement.value === document.statutPaiement || state__facturationDocuments_documentsFiltre.value.statut_paiement.value === 'tous'
+        }
+
+        let estInclusDateMin = true
+        if (state__facturationDocuments_documentsFiltre.value.date_min) {
+            const dateMin = $dayjs(state__facturationDocuments_documentsFiltre.value.date_min, 'DD/MM/YYYY')
+            const dateDocument = $dayjs(document.date, 'YYYY-MM-DD')
+
+            estInclusDateMin = dateDocument.isSameOrAfter(dateMin)
+        }
+        
+        let estInclusDateMax = true
+        if (state__facturationDocuments_documentsFiltre.value.date_max) {
+            const dateMax = $dayjs(state__facturationDocuments_documentsFiltre.value.date_max, 'DD/MM/YYYY')
+            const dateDocument = $dayjs(document.date, 'YYYY-MM-DD')
+
+            estInclusDateMax = dateDocument.isSameOrBefore(dateMax)
+        }
+        
+        return estInclusType && estInclusStatut && estInclusStatutPaiement && estInclusDateMin && estInclusDateMax
+    }
+
+    /**
+     * Copier le donnees d'un document.
+     * 
+     * @param {Object} document Le document a copier.
+     * @param {String} uuid L'UUID du nouveau document
+     * @param {String} num Le numero du nouveau document
+     * @param {String} date La date du nouveau document
+     * @param {String} type Le type du nouveau document
+     * 
+     * @returns {Object}
+     */
+    const utility__facturationDocuments_copierDocument = (document, uuid = '', num = '', date = '', type = '') => {
+        const copieDocument = JSON.parse(JSON.stringify(document))
+
+        // mettre a jour les infos du document
+        copieDocument.uuid = uuid
+        copieDocument.num = num
+
+        if (date) {
+            copieDocument.date = date
+        }
+
+        if (type) {
+            copieDocument.type = type
+        }
+
+        copieDocument.statut = 'en cours'
+        copieDocument.statutEnvoi = '0'
+        copieDocument.suiviExist = '0'
+        copieDocument.transforme = false
+        copieDocument.destinations = null
+
+        return copieDocument
+    }
+
+    /**
+     * Recuperer les paranetres pour l'export CSV et PDF
+     * 
+     * @return {{
+     *   documents_uuid: Array<String>,
+     *   types: Array<String>,
+     *   statut: String,
+     *   statut_paiement: Boolean,
+     *   famille_clients_uuid: String,
+     *   partenaire_uuid: String,
+     *   date_min: String,
+     *   date_max: String,
+     * }}
+     **/
+    const utility__facturationDocuments_recupererParametreExport = () => {
+        const payload = utility__facturationDocuments_formaterFiltreValeur(false)
+
+        const docTypes = payload.types.split(',')
+
+        // types
+        if (docTypes.length === 1) {
+            // il fau respecter la case, sinon le PDF ne porte pas le bon titre
+            const apiTypes = {
+                devis: 'Devis',
+                bl: 'BL',
+                facture: 'Facture',
+                avoir: 'Avoir'
+            }
+            payload.types = [apiTypes[docTypes[0]]]
+        } else {
+            payload.types = docTypes
+        }
+
+        // documents_uuid
+        if (state__facturationDocuments_documentSelections.value.length > 0) {
+            payload.documents_uuid = state__facturationDocuments_documentSelections.value
+        }
+
+        return payload
+    }
+
+    return {
+        state__facturationDocuments_documentsFiltre,
+        state__facturationDocuments_liste,
+        state__facturationDocuments_listeChargee,
+        state__facturationDocuments_documentSelections,
+        state__facturationDocuments_uuidsExlus,
+        state__facturationDocuments_numeroSuivant,
+        state__facturationDocuments_documentCourant,
+        state__facturationDocuments_documentCree,
+        state__facturationDocuments_suiviMailListe,
+        state__facturationDocuments_actionbarConfigurations,
+        state__facturationDocuments_estModeMultiSelection,
+        state__facturationDocuments_listExport,
+        action__facturationDocuments_reinitialiserStore,
+        action__facturationDocuments_telechargerArchive,
+        action__facturationDocuments_recupererListeExport,
+        action__facturationDocuments_recupererListe,
+        action__facturationDocuments_recupererNumeroSuivant,
+        action__facturationDocuments_creerDocument,
+        action__facturationDocuments_modifierDocument,
+        action__facturationDocuments_recupererDetailDocument,
+        action__facturationDocuments_supprimerDocument,
+        action__facturationDocuments_modifierStatutEnvoiDocument,
+        action__facturationDocuments_modifierStatutPaiementFacture,
+        action__facturationDocuments_dupliquerDocument,
+        action__facturationDocuments_validerDocument,
+        action__facturationDocuments_transformerDocument,
+        action__facturationDocuments_recupererSuiviMailListe,
+        action__facturationDocuments_creerExport,
+        action__facturationDocuments_envoyer,
+        action__facturationDocuments_exporterListeCsv,
+        action__facturationDocuments_exporterListePdf,
+        getters__facturationDocuments_documentsTotaux,
+        getters__facturationDocuments_totalMontantHt,
+        getters__facturationDocuments_totalMontantTtc,
+    }
+})
