@@ -1,48 +1,46 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, beforeEach } from 'vitest'
 import mckitui from 'mc-kit-ui/src/plugins/mc-kit-ui'
-import DocumentDasboardExportList from '../DocumentDasboardExportList.vue'
+import DocumentsInformationDocument from '../DocumentsInformationDocument.vue'
 
-describe('DocumentDasboardExportList.vue', () => {
+describe('DocumentsInformationDocument.vue', () => {
   let wrapper
 
+  const documentDonnees = {
+    id: 51,
+    uuid: '776297aa-719d-482a-9ece-247cc0e92fd1',
+    extension: 'pdf',
+    type: 'Mixte',
+    merge: true,
+    send: false,
+    cc: true,
+  }
+
   beforeEach(() => {
-    wrapper = mount(DocumentDasboardExportList, {
-      props: {
-        documentDasboardExportListTotal: 7,
-      },
+    wrapper = mount(DocumentsInformationDocument, {
       global: {
         plugins: [mckitui],
-        stubs: {
-          'mc-card': { template: '<div><slot /></div>' },
-          'mc-title-heading': { props: ['headingText'], template: '<h3>{{ headingText }}</h3>' },
-          'mc-link': { props: ['linkText', 'linkHref'], template: '<a :href="linkHref">{{ linkText }}</a>' },
-        },
       },
-      slots: {
-        default: '<div class="slot-content">Slot test</div>',
+      props: {
+        documentsActionDocumentDonnee: documentDonnees,
       },
     })
   })
 
-  it('affiche le titre avec le nombre total d’exports', () => {
-    const heading = wrapper.find('h3')
-    expect(heading.exists()).toBe(true)
-    expect(heading.text()).toContain('7 exports')
-  })
+  it('affiche "Oui" ou "Non" pour chaque information selon les props', () => {
+    // Vérifie le champ merge
+    const mergeSpan = wrapper.findComponent({ ref: undefined, name: undefined, selector: '[test-id="test_daddfu"]' })
+    expect(mergeSpan.exists()).toBe(true)
+    expect(mergeSpan.text().trim()).toBe('Oui')
 
-  it('contient la description et les liens d’aide', () => {
-    const description = wrapper.find('.documents_dashboard_export_list_card_titre_description')
-    expect(description.exists()).toBe(true)
+    // Vérifie le champ send
+    const sendSpan = wrapper.findComponent({ selector: '[test-id="test_dadden"]' })
+    expect(sendSpan.exists()).toBe(true)
+    expect(sendSpan.text().trim()).toBe('Non')
 
-    const links = wrapper.findAll('a')
-    expect(links.length).toBe(3)
-    expect(links[0].attributes('href')).toContain('help.macompta.fr')
-  })
-
-  it('rend le contenu du slot', () => {
-    const slot = wrapper.find('.slot-content')
-    expect(slot.exists()).toBe(true)
-    expect(slot.text()).toBe('Slot test')
+    // Vérifie le champ cc
+    const ccSpan = wrapper.findComponent({ selector: '[test-id="test_daddcc"]' })
+    expect(ccSpan.exists()).toBe(true)
+    expect(ccSpan.text().trim()).toBe('Oui')
   })
 })
