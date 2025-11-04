@@ -1,58 +1,81 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, beforeEach } from 'vitest'
+import { createTestingPinia } from '@pinia/testing'
 import mckitui from 'mc-kit-ui/src/plugins/mc-kit-ui'
+import dayjs from '@/plugins/dayjs'
+import DocumentsVisualiserExport from '../DocumentsVisualiserExport.vue'
+import exportsSucces from '~/tests/__fixtures__/facturation/api-facturation-exports-succes.json'
 
-import DocumentsInformationDocument from '../DocumentsInformationDocument.vue'
+describe('DocumentsVisualiserExport.vue', () => {
+  let wrapper
 
-describe('DocumentsInformationDocument.vue', () => {
-  let wrapper = null
-
-  const documentDonnees = {
-    id: 51,
-    uuid: '776297aa-719d-482a-9ece-247cc0e92fd1',
-    userId: { uuid: '18105' },
-    extension: 'pdf',
-    type: 'Mixte',
-    isDelete: false,
-    statut: true,
-    error: false,
-    send: false,
-    merge: false,
-    mail: false,
-    cc: false,
-    documents: ['DE000036', 'DE000037'],
-    destinataires: null,
-    mailContent: null,
-    archive: 'Export_30ced1af3875bac0e9d0101f61033929.zip',
-    createdAt: '2025-09-24 10:55:44',
-    updatedAt: '2025-09-24 10:56:20',
-    hash: '308d5275e6d8a902bfe6ab306f5230ea3e6eaf5d',
-    partenaires: ['The Electric City', 'FED Division, Aerospace Group, Eaton'],
-    userMail: 'pcistac@macompta.fr',
-  }
+  const ligneDonnee =exportsSucces.items[0]
 
   beforeEach(() => {
-    wrapper = mount(DocumentsInformationDocument, {
+    wrapper = mount(DocumentsVisualiserExport, {
       global: {
-        plugins: [mckitui],
+        plugins: [mckitui, dayjs, createTestingPinia()],
+        stubs: {
+          McDialogbox: true,
+          McCard: true,
+          McAccordion: true,
+        },
       },
       props: {
-        documentsActionDocumentDonnee: documentDonnees,
+        documentsVisualiserExportVisible: true,
+        documentsVisualiserExportLigneDonne: ligneDonnee,
       },
     })
   })
 
-  it('affiche "Oui" ou "Non" pour chaque information selon les props', () => {
-    const mergeSpan = wrapper.findComponent('[test-id="test_daddfu"]')
-    expect(mergeSpan.exists()).toBeTruthy()
-    expect(mergeSpan.text()).toBe('Oui')
+  it('affiche le dialog quand documentsVisualiserExportVisible est true', () => {
+    const dialog = wrapper.findComponent({name: 'mc-dialogbox'})
+    expect(dialog.exists()).toBe(true)
+  })
 
-    const sendSpan = wrapper.find('[test-id="test_dadden"]')
-    expect(sendSpan.exists()).toBeTruthy()
-    expect(sendSpan.text()).toBe('Non')
+  it('contient les selects et le téléchargement .zip', () => {
+    const selectDocs = wrapper.findComponent('[test-id="test_dvedsd"]')
+    const selectPartenaires = wrapper.findComponent('[test-id="test_dvedsp"]')
+    const selectDestinataires = wrapper.findComponent('[test-id="test_dvedsdest"]')
+    const downloadZip = wrapper.findComponent('[test-id="test_dvedtz"]')
 
-    const ccSpan = wrapper.find('[test-id="test_daddcc"]')
-    expect(ccSpan.exists()).toBeTruthy()
-    expect(ccSpan.text()).toBe('Oui')
+    expect(selectDocs.exists()).toBe(true)
+    expect(selectPartenaires.exists()).toBe(true)
+    expect(selectDestinataires.exists()).toBe(true)
+    expect(downloadZip.exists()).toBe(true)
+  })
+
+  it('émet "documentVisualiserExportFermerEmise" quand on ferme le dialog', async () => {
+    const dialog = wrapper.findComponent('[data-test-id="dialogbox"]')
+    await dialog.vm.$emit('close-dialogbox')
+
+    const emitted = wrapper.emitted('documentVisualiserExportFermerEmise')
+    expect(emitted).toHaveLength(1)
+    expect(emitted[0][0]).toBe(false)
+  })
+
+  it('n’affiche pas la section de téléchargement quand archive est absente', async () => {
+    await wrapper.setProps({
+      documentsVisualiserExportLigneDonne: {
+        ...ligneDonnee,
+        archive: null,
+      },
+    })
+
+    expect(wrapper.find('[test-id="test_dvedtz"]').exists()).toBe(false)
+  })
+
+  it('calcule correctement les options des selects', () => {
+    const vm = wrapper.vm
+
+    expect(vm.comp__documentsVisualiserExport_OptionsDocuments).toEqual([
+      { label: 'Doc A', value: 1 },
+    ])
+    expect(vm.comp__documentsVisualiserExport_OptionsPartenaires).toEqual([
+      { label: 'Partenaire X', value: 2 },
+    ])
+    expect(vm.comp__documentsVisualiserExport_OptionsDestinataires).toEqual([
+      { label: 'John Doe', value: 3 },
+    ])
   })
 })
