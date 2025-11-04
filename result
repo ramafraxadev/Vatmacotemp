@@ -1,46 +1,81 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, beforeEach } from 'vitest'
+import { createTestingPinia } from '@pinia/testing'
 import mckitui from 'mc-kit-ui/src/plugins/mc-kit-ui'
-import DocumentsInformationDocument from '../DocumentsInformationDocument.vue'
+import dayjs from '@/plugins/dayjs'
+import DocumentsVisualiserExport from '../DocumentsVisualiserExport.vue'
 
-describe('DocumentsInformationDocument.vue', () => {
+// fixture adaptée au format attendu par normalizeToOption()
+const ligneDonneeMock = {
+  documents: [{ id: 1, name: 'Doc A' }],
+  partenaires: [{ id: 2, name: 'Partenaire X' }],
+  destinataires: [{ id: 3, name: 'John Doe' }],
+  archive: true,
+}
+
+describe('DocumentsVisualiserExport.vue', () => {
   let wrapper
 
-  const documentDonnees = {
-    id: 51,
-    uuid: '776297aa-719d-482a-9ece-247cc0e92fd1',
-    extension: 'pdf',
-    type: 'Mixte',
-    merge: true,
-    send: false,
-    cc: true,
-  }
-
   beforeEach(() => {
-    wrapper = mount(DocumentsInformationDocument, {
+    wrapper = mount(DocumentsVisualiserExport, {
       global: {
-        plugins: [mckitui],
+        plugins: [mckitui, dayjs, createTestingPinia()],
+        stubs: {
+          // Stub seulement les sous-composants non essentiels
+          DocumentsInformationDocument: true,
+          DocumentsActionsDocument: true,
+          DocumentsPartenaireDestinataireSelect: true,
+          DocumentsTelechargementZip: true,
+        },
       },
       props: {
-        documentsActionDocumentDonnee: documentDonnees,
+        documentsVisualiserExportVisible: true,
+        documentsVisualiserExportLigneDonne: ligneDonneeMock,
       },
     })
   })
 
-  it('affiche "Oui" ou "Non" pour chaque information selon les props', () => {
-    // Vérifie le champ merge
-    const mergeSpan = wrapper.findComponent({ ref: undefined, name: undefined, selector: '[test-id="test_daddfu"]' })
-    expect(mergeSpan.exists()).toBe(true)
-    expect(mergeSpan.text().trim()).toBe('Oui')
+  it('affiche le dialog quand documentsVisualiserExportVisible est true', () => {
+    const dialog = wrapper.findComponent({ name: 'mc-dialogbox' })
+    expect(dialog.exists()).toBe(true)
+  })
 
-    // Vérifie le champ send
-    const sendSpan = wrapper.findComponent({ selector: '[test-id="test_dadden"]' })
-    expect(sendSpan.exists()).toBe(true)
-    expect(sendSpan.text().trim()).toBe('Non')
+  it('contient les selects et le téléchargement .zip', () => {
+    // comme on stub les sous-composants, on vérifie leur présence par tag
+    expect(wrapper.findComponent({ name: 'documents-partenaire-destinataire-select' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'documents-telechargement-zip' }).exists()).toBe(true)
+  })
 
-    // Vérifie le champ cc
-    const ccSpan = wrapper.findComponent({ selector: '[test-id="test_daddcc"]' })
-    expect(ccSpan.exists()).toBe(true)
-    expect(ccSpan.text().trim()).toBe('Oui')
+  it('émet "documentVisualiserExportFermerEmise" quand on ferme le dialog', async () => {
+    const dialog = wrapper.findComponent({ name: 'mc-dialogbox' })
+    await dialog.vm.$emit('close-dialogbox')
+
+    const emitted = wrapper.emitted('documentVisualiserExportFermerEmise')
+    expect(emitted).toBeTruthy()
+    expect(emitted[0]).toEqual([false])
+  })
+
+  it('n’affiche pas la section de téléchargement quand archive est absente', async () => {
+    await wrapper.setProps({
+      documentsVisualiserExportLigneDonne: {
+        ...ligneDonneeMock,
+        archive: null,
+      },
+    })
+
+    expect(wrapper.findComponent({ name: 'documents-telechargement-zip' }).exists()).toBe(false)
+  })
+
+  it('calcule correctement les options des selects', () => {
+    const vm = wrapper.vm
+    expect(vm.comp__documentsVisualiserExport_OptionsDocuments).toEqual([
+      { label: 'Doc A', value: 1 },
+    ])
+    expect(vm.comp__documentsVisualiserExport_OptionsPartenaires).toEqual([
+      { label: 'Partenaire X', value: 2 },
+    ])
+    expect(vm.comp__documentsVisualiserExport_OptionsDestinataires).toEqual([
+      { label: 'John Doe', value: 3 },
+    ])
   })
 })
