@@ -1,145 +1,123 @@
 <template>
-  <mc-dialogbox
-    :show-dialogbox="documentsVisualiserExportVisible"
-    dialogbox-title="EXPORT DE DOCUMENTS"
-    dialogbox-class="document_visualiser_export"
-    dialogbox-width="700"
-    @close-dialogbox="$emit('documentVisualiserExportFermerEmise', false)"
-  >
-    <mc-card>
-      <!-- Infos generales -->
-      <mc-accordion accordion-label="Information du document" 
-      :accordion-start-open="true">
-        <documents-information-document
-          :documents-information-document-donnee="documentsVisualiserExportLigneDonne"
-        ></documents-information-document>
-      </mc-accordion>
+    <div class="documents_telechargement_zip">
 
-      <mc-accordion
-        accordion-label="Documents / Partenaires / Destinataires concernés"
-        :accordion-start-open="false"
-        >
-        <!-- Documents -->
-        <documents-partenaire-destinataire-select
-            test-id="test_dvedsd"
-            :documents-partenaire-destinataire-select-valeur="null"
-            :documents-partenaire-destinataire-select-options="comp__documentsVisualiserExport_OptionsDocuments"
-            :documents-partenaire-destinataire-select-label="'Documents concernés :'"
-            :documents-partenaire-destinataire-select-initiale="{ label: 'Afficher les documents', value: '' }"
-            :documents-partenaire-destinataire-select-formulaire-active="true"
-            :documents-partenaire-destinataire-select-label-inline="false"
-        ></documents-partenaire-destinataire-select>
-
-        <!-- Partenaires -->
-        <documents-partenaire-destinataire-select
-            test-id="test_dvedsp"
-            :documents-partenaire-destinataire-select-valeur="null"
-            :documents-partenaire-destinataire-select-options="comp__documentsVisualiserExport_OptionsPartenaires"
-            :documents-partenaire-destinataire-select-label="'Partenaire(s) concerné(s) :'"
-            :documents-partenaire-destinataire-select-initiale="{ label: 'Afficher le(s) partenaire(s)', value: '' }"
-            :documents-partenaire-destinataire-select-formulaire-active="true"
-            :documents-partenaire-destinataire-select-label-inline="false"
-        ></documents-partenaire-destinataire-select>
-
-        <!-- Destinataires -->
-        <documents-partenaire-destinataire-select
-            test-id="test_dvedsdest"
-            :documents-partenaire-destinataire-select-valeur="null"
-            :documents-partenaire-destinataire-select-options="comp__documentsVisualiserExport_OptionsDestinataires"
-            :documents-partenaire-destinataire-select-label="'Destinataires concernés :'"
-            :documents-partenaire-destinataire-select-initiale="{ label: 'Afficher les destinataires', value: '' }"
-            :documents-partenaire-destinataire-select-formulaire-active="true"
-            :documents-partenaire-destinataire-select-label-inline="false"
-        ></documents-partenaire-destinataire-select>
-        </mc-accordion>
-
-      <mc-accordion accordion-label="Action du document" :accordion-start-open="false">
-        <documents-actions-document
-          test-id="test_dvedad"
-          :documents-action-document-donnee="documentsVisualiserExportLigneDonne"
-        ></documents-actions-document>
-      </mc-accordion>
-      
-      <mc-accordion accordion-label="téléchargement de l'archives .zip" 
-      :accordion-start-open="false"
-      v-if="documentsVisualiserExportLigneDonne?.archive"
-      >
-        <!-- contenu éventuel -->
-        <documents-telechargement-zip
-            test-id="test_dvedtz"
-            :documents-telechargement-zip-donnee="documentsVisualiserExportLigneDonne"
-            @documents-telechargement-zip-annuler-emise="$emit('documentVisualiserExportFermerEmise', false)">
-           </documents-telechargement-zip>
-      </mc-accordion>
-    </mc-card>
-  </mc-dialogbox>
+        <div class="documents_telechargement_zip_wrapper ">
+            <div class="documents_telechargement_zip_wrapper_grid_item">
+                <mc-link 
+                        link-color="pink" 
+                        :link-text="documentsTelechargementZipDonnee?.archive || ''" 
+                        link-href=""
+                        ></mc-link>
+                <mc-button
+                    button-style="secondary"
+                    button-class="documents_telechargement_zip_wrapper_grid_item_download_button"
+                    :add-button-icon-left="true"
+                    button-text="Télécharger"
+                    button-icon-left-name="download"
+                    test-id="test_dtzt"
+                    @button-click="documentsTelechargementZip_telecharger"
+                ></mc-button>
+            </div>
+            <div class="documents_telechargement_zip_wrapper_grid_item_cancel_button">
+                <mc-button
+                    button-style="primary"
+                    :add-button-icon-left="true"
+                    button-text="Annuler"
+                    button-icon-left-name="close"
+                    test-id="test_dtza"
+                    @button-click="$emit('DocumentsTelechargementZipAnnulerEmise')"
+                ></mc-button>
+            </div>
+        </div>
+    </div>
 </template>
 
 <script setup>
-    import { computed } from 'vue'
-    import DocumentsInformationDocument from './DocumentsInformationDocument.vue'
-    import DocumentsActionsDocument from './DocumentsActionsDocument.vue'
-    import DocumentsPartenaireDestinataireSelect from './DocumentsPartenaireDestinataireSelect.vue'
-    import DocumentsTelechargementZip from './DocumentsTelechargementZip.vue'
+    /*******import*******/
+    import { inject } from 'vue'
 
+    import { useFacturationDocumentsStore } from '../../../stores/facturation/store-facturation-documents'
+    
     /***** Props *****/
     const props = defineProps({
-        documentsVisualiserExportVisible: {
-            type: Boolean,
-            default: false,
-        },
-
-        documentsVisualiserExportLigneDonne: {
+        /**
+         * @description Model du composant
+          /**
+     * @type {{
+     *   id: Number,
+     *   uuid: String,
+     *   userId: {
+     *     uuid: String
+     *   },
+     *   extension: String,
+     *   type: String,
+     *   isDelete: Boolean,
+     *   statut: Boolean,
+     *   error: Boolean,
+     *   send: Boolean,
+     *   merge: Boolean,
+     *   mail: Boolean,
+     *   cc: Boolean,
+     *   documents: String[],
+     *   destinataires: (String[] ),
+     *   mailContent: (String ),
+     *   archive: (String ),
+     *   createdAt: String,
+     *   updatedAt: (String ),
+     *   hash: String,
+     *   partenaires: String[],
+     *   userMail: String
+     * }}
+     */
+         
+        documentsTelechargementZipDonnee: {
             type: Object,
             required: true
         }
     })
-    /***** Emits *****/
-    const emit = defineEmits(['documentVisualiserExportFermerEmise'])
 
-    /***** Helpers pour normaliser une entrée en option {label, value} *****/
-    function normalizeToOption(item) {
-    
-        if (item && typeof item === 'object') {
-            if ('label' in item && 'value' in item) return item
-            const label = item.name ?? item.nom ?? item.title ?? item.label ?? JSON.stringify(item)
-            const value = item.id ?? item.value ?? label
-            return { label, value }
+    defineEmits(['DocumentsTelechargementZipAnnulerEmise'])
+
+    /***** Store *****/
+    const storeFD = useFacturationDocumentsStore()
+
+     /***** les inject *****/  
+    const $mcNotify = inject('$mcNotify')
+
+    const documentsTelechargementZip_telecharger = async () => {
+        try {
+            await storeFD.action__facturationDocuments_telechargerArchive(props.documentsTelechargementZipDonnee?.archive)
+        } catch (error) {
+            $mcNotify.error(error.message)
         }
-
-        if (item === 0 || item) {
-            return { label: String(item), value: item }
-        }
-
-        return null
     }
 
-    /***** Computed  *****/
-
-    const comp__documentsVisualiserExport_OptionsPartenaires = computed(() => {
-        const partenaires = props.documentsVisualiserExportLigneDonne?.partenaires
-        if (!Array.isArray(partenaires)) return []
-        return partenaires
-            .map(p => normalizeToOption(p))
-            .filter(Boolean)
-    })
-
-    const comp__documentsVisualiserExport_OptionsDestinataires = computed(() => {
-        const destinataires = props.documentsVisualiserExportLigneDonne?.destinataires
-        if (!Array.isArray(destinataires)) return []
-        return destinataires
-            .map(d => normalizeToOption(d))
-            .filter(Boolean)
-    })
-
-    const comp__documentsVisualiserExport_OptionsDocuments = computed(() => {
-        const documents = props.documentsVisualiserExportLigneDonne?.documents
-        if (!Array.isArray(documents)) return []
-        return documents
-            .map(doc => normalizeToOption(doc))
-            .filter(Boolean)
-    })
-
-    
 </script>
 
+<style lang="scss" scoped>
+    .documents_telechargement_zip {
+        &_wrapper {
+            display: grid;
+            grid-template-columns: 1fr; 
+            row-gap: rem(10); 
+            &_grid_item {
+                display: grid;
+                grid-template-columns: auto 1fr;
+                align-items: center;
+                column-gap: rem(20);
+                &_download_button {
+                    justify-self: end;
+                }
+                &_cancel_button {
+                    margin-top: rem(10);
+                    justify-self: center;
+                }
+                
+
+
+            }
+        }
+
+        
+    }
+</style>
