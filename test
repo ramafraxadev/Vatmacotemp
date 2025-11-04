@@ -15,7 +15,7 @@ import exportsSucces from '~/tests/__fixtures__/facturation/api-facturation-expo
 
 import DocumentsTelechargementZip from '../DocumentsTelechargementZip.vue'
 
-describe('DocumentsTelechargementZip.vue', () => {
+describe('DocumentsTelechargementZip', () => {
   let wrapper = null
   let mockGet = null
   let notifySpy = null
@@ -36,7 +36,7 @@ describe('DocumentsTelechargementZip.vue', () => {
 
     notifySpy = vi.fn()
 
-    wrapper = mount(FacturationExports, {
+    wrapper = mount(DocumentsTelechargementZip, {
       global: {
         plugins: [mckitui, dayjs, store, router],
         provide: {
