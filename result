@@ -1,81 +1,84 @@
-import { mount } from '@vue/test-utils'
-import { describe, it, expect, beforeEach } from 'vitest'
-import { createTestingPinia } from '@pinia/testing'
-import mckitui from 'mc-kit-ui/src/plugins/mc-kit-ui'
-import dayjs from '@/plugins/dayjs'
-import DocumentsVisualiserExport from '../DocumentsVisualiserExport.vue'
+import { mount, flushPromises } from '@vue/test-utils'
+import { describe, it, beforeEach, afterEach, expect, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { useFacturationDocumentsStore } from '@/stores/facturation/store-facturation-documents'
+import DocumentsTelechargementZip from '../DocumentsTelechargementZip.vue'
 
-// fixture adaptée au format attendu par normalizeToOption()
-const ligneDonneeMock = {
-  documents: [{ id: 1, name: 'Doc A' }],
-  partenaires: [{ id: 2, name: 'Partenaire X' }],
-  destinataires: [{ id: 3, name: 'John Doe' }],
-  archive: true,
+// Données factices
+const mockDonnee = {
+  id: 1,
+  archive: 'Archive_Test_123.zip'
 }
 
-describe('DocumentsVisualiserExport.vue', () => {
+describe('DocumentsTelechargementZip.vue', () => {
   let wrapper
+  let mockTelecharger
+  let mockNotify
 
   beforeEach(() => {
-    wrapper = mount(DocumentsVisualiserExport, {
-      global: {
-        plugins: [mckitui, dayjs, createTestingPinia()],
-        stubs: {
-          // Stub seulement les sous-composants non essentiels
-          DocumentsInformationDocument: true,
-          DocumentsActionsDocument: true,
-          DocumentsPartenaireDestinataireSelect: true,
-          DocumentsTelechargementZip: true,
-        },
-      },
+    // Crée un store Pinia de test
+    setActivePinia(createPinia())
+
+    // Mock du store et de la fonction de téléchargement
+    const store = useFacturationDocumentsStore()
+    mockTelecharger = vi.spyOn(store, 'action__facturationDocuments_telechargerArchive')
+    mockTelecharger.mockResolvedValueOnce()
+
+    // Mock de la notification injectée
+    mockNotify = {
+      error: vi.fn(),
+      success: vi.fn(),
+    }
+
+    // Monte le composant
+    wrapper = mount(DocumentsTelechargementZip, {
       props: {
-        documentsVisualiserExportVisible: true,
-        documentsVisualiserExportLigneDonne: ligneDonneeMock,
+        documentsTelechargementZipDonnee: mockDonnee,
+      },
+      global: {
+        provide: {
+          $mcNotify: mockNotify,
+        },
+        stubs: ['mc-button', 'mc-link'],
       },
     })
   })
 
-  it('affiche le dialog quand documentsVisualiserExportVisible est true', () => {
-    const dialog = wrapper.findComponent({ name: 'mc-dialogbox' })
-    expect(dialog.exists()).toBe(true)
+  afterEach(() => {
+    vi.clearAllMocks()
   })
 
-  it('contient les selects et le téléchargement .zip', () => {
-    // comme on stub les sous-composants, on vérifie leur présence par tag
-    expect(wrapper.findComponent({ name: 'documents-partenaire-destinataire-select' }).exists()).toBe(true)
-    expect(wrapper.findComponent({ name: 'documents-telechargement-zip' }).exists()).toBe(true)
+  it('affiche le nom de l’archive', () => {
+    expect(wrapper.html()).toContain('Archive_Test_123.zip')
   })
 
-  it('émet "documentVisualiserExportFermerEmise" quand on ferme le dialog', async () => {
-    const dialog = wrapper.findComponent({ name: 'mc-dialogbox' })
-    await dialog.vm.$emit('close-dialogbox')
+  it('appelle la méthode de téléchargement quand on clique sur "Télécharger"', async () => {
+    // simule le clic
+    const button = wrapper.find('[test-id="test_dtzt"]')
+    await button.trigger('button-click')
+    await flushPromises()
 
-    const emitted = wrapper.emitted('documentVisualiserExportFermerEmise')
+    expect(mockTelecharger).toHaveBeenCalledOnce()
+    expect(mockTelecharger).toHaveBeenCalledWith('Archive_Test_123.zip')
+  })
+
+  it('émet un événement "DocumentsTelechargementZipAnnulerEmise" quand on clique sur Annuler', async () => {
+    const buttonCancel = wrapper.find('[test-id="test_dtza"]')
+    await buttonCancel.trigger('button-click')
+
+    const emitted = wrapper.emitted('DocumentsTelechargementZipAnnulerEmise')
     expect(emitted).toBeTruthy()
-    expect(emitted[0]).toEqual([false])
+    expect(emitted[0]).toEqual([])
   })
 
-  it('n’affiche pas la section de téléchargement quand archive est absente', async () => {
-    await wrapper.setProps({
-      documentsVisualiserExportLigneDonne: {
-        ...ligneDonneeMock,
-        archive: null,
-      },
-    })
+  it('appelle $mcNotify.error si le téléchargement échoue', async () => {
+    mockTelecharger.mockRejectedValueOnce(new Error('Erreur de téléchargement'))
 
-    expect(wrapper.findComponent({ name: 'documents-telechargement-zip' }).exists()).toBe(false)
-  })
+    const button = wrapper.find('[test-id="test_dtzt"]')
+    await button.trigger('button-click')
+    await flushPromises()
 
-  it('calcule correctement les options des selects', () => {
-    const vm = wrapper.vm
-    expect(vm.comp__documentsVisualiserExport_OptionsDocuments).toEqual([
-      { label: 'Doc A', value: 1 },
-    ])
-    expect(vm.comp__documentsVisualiserExport_OptionsPartenaires).toEqual([
-      { label: 'Partenaire X', value: 2 },
-    ])
-    expect(vm.comp__documentsVisualiserExport_OptionsDestinataires).toEqual([
-      { label: 'John Doe', value: 3 },
-    ])
+    expect(mockNotify.error).toHaveBeenCalledWith('Erreur de téléchargement')
   })
 })
+
