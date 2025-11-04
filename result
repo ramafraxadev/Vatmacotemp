@@ -1,47 +1,51 @@
+// app/components/facturation/exports/__tests__/DocumentsTelechargementZip.spec.js
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, beforeEach, afterEach, expect, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+
+import mckitui from 'mc-kit-ui/src/plugins/mc-kit-ui'
+import dayjs from '@/plugins/dayjs'
+import store from '@/store/store'
+import router from '~/tests/utils/test-router'
+
 import { useFacturationDocumentsStore } from '@/stores/facturation/store-facturation-documents'
 import DocumentsTelechargementZip from '../DocumentsTelechargementZip.vue'
 
-// Données factices
 const mockDonnee = {
   id: 1,
-  archive: 'Archive_Test_123.zip'
+  archive: 'Archive_Test_123.zip',
 }
 
 describe('DocumentsTelechargementZip.vue', () => {
   let wrapper
-  let mockTelecharger
   let mockNotify
+  let spyTelecharger
 
-  beforeEach(() => {
-    // Crée un store Pinia de test
+  beforeEach(async () => {
+    // Pinia actif pour que useFacturationDocumentsStore() fonctionne
     setActivePinia(createPinia())
 
-    // Mock du store et de la fonction de téléchargement
-    const store = useFacturationDocumentsStore()
-    mockTelecharger = vi.spyOn(store, 'action__facturationDocuments_telechargerArchive')
-    mockTelecharger.mockResolvedValueOnce()
+    // Notifications injectées
+    mockNotify = { error: vi.fn(), success: vi.fn() }
 
-    // Mock de la notification injectée
-    mockNotify = {
-      error: vi.fn(),
-      success: vi.fn(),
-    }
-
-    // Monte le composant
+    // Monte le composant avec TOUS les plugins demandés
     wrapper = mount(DocumentsTelechargementZip, {
       props: {
         documentsTelechargementZipDonnee: mockDonnee,
       },
       global: {
-        provide: {
-          $mcNotify: mockNotify,
-        },
-        stubs: ['mc-button', 'mc-link'],
+        plugins: [mckitui, dayjs, store, router],
+        provide: { $mcNotify: mockNotify },
+        // ne pas stub mc-button / mc-link, on a besoin des events personnalisés
       },
     })
+
+    // IMPORTANT: récupère le même store instance que le composant
+    const storeFD = useFacturationDocumentsStore()
+    spyTelecharger = vi
+      .spyOn(storeFD, 'action__facturationDocuments_telechargerArchive')
+      .mockResolvedValue()
+    await flushPromises()
   })
 
   afterEach(() => {
@@ -52,33 +56,32 @@ describe('DocumentsTelechargementZip.vue', () => {
     expect(wrapper.html()).toContain('Archive_Test_123.zip')
   })
 
-  it('appelle la méthode de téléchargement quand on clique sur "Télécharger"', async () => {
-    // simule le clic
-    const button = wrapper.find('[test-id="test_dtzt"]')
-    await button.trigger('button-click')
+  it('déclenche le téléchargement au clic sur "Télécharger"', async () => {
+    const btnDownload = wrapper.findComponent('[test-id="test_dtzt"]')
+    // mc-button émet "button-click"
+    await btnDownload.vm.$emit('button-click')
     await flushPromises()
 
-    expect(mockTelecharger).toHaveBeenCalledOnce()
-    expect(mockTelecharger).toHaveBeenCalledWith('Archive_Test_123.zip')
+    expect(spyTelecharger).toHaveBeenCalledTimes(1)
+    expect(spyTelecharger).toHaveBeenCalledWith('Archive_Test_123.zip')
   })
 
-  it('émet un événement "DocumentsTelechargementZipAnnulerEmise" quand on clique sur Annuler', async () => {
-    const buttonCancel = wrapper.find('[test-id="test_dtza"]')
-    await buttonCancel.trigger('button-click')
+  it('émet "DocumentsTelechargementZipAnnulerEmise" au clic sur "Annuler"', async () => {
+    const btnCancel = wrapper.findComponent('[test-id="test_dtza"]')
+    await btnCancel.vm.$emit('button-click')
 
     const emitted = wrapper.emitted('DocumentsTelechargementZipAnnulerEmise')
     expect(emitted).toBeTruthy()
     expect(emitted[0]).toEqual([])
   })
 
-  it('appelle $mcNotify.error si le téléchargement échoue', async () => {
-    mockTelecharger.mockRejectedValueOnce(new Error('Erreur de téléchargement'))
+  it('notifie une erreur si le téléchargement échoue', async () => {
+    spyTelecharger.mockRejectedValueOnce(new Error('Erreur de téléchargement'))
 
-    const button = wrapper.find('[test-id="test_dtzt"]')
-    await button.trigger('button-click')
+    const btnDownload = wrapper.findComponent('[test-id="test_dtzt"]')
+    await btnDownload.vm.$emit('button-click')
     await flushPromises()
 
     expect(mockNotify.error).toHaveBeenCalledWith('Erreur de téléchargement')
   })
 })
-
